@@ -21,6 +21,7 @@ describe("statistics schema", () => {
             date: "2026-07-02",
             activeMs: 10,
             postureScore: 120,
+            postureSampleCount: 5,
             sessions: 2,
             warnings: 1
           },
@@ -36,6 +37,7 @@ describe("statistics schema", () => {
           date: "2026-07-02",
           activeMs: 10,
           postureScore: 100,
+          postureSampleCount: 5,
           sessions: 2,
           warnings: 1
         }

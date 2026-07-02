@@ -86,3 +86,28 @@ export async function getTodayStats(now = new Date()): Promise<DailyStats> {
     activeMs: today.activeMs + Math.max(0, now.getTime() - startedAt.getTime())
   };
 }
+
+export async function recordPostureSampleBatch(
+  scoreTotal: number,
+  sampleCount: number,
+  now = new Date()
+): Promise<StoredStatistics> {
+  if (!Number.isFinite(scoreTotal) || !Number.isFinite(sampleCount) || sampleCount <= 0) {
+    return getStatistics();
+  }
+
+  const statistics = await getStatistics();
+  const day = ensureDay(statistics, getLocalDateKey(now));
+  const existingTotal = (day.postureScore ?? 0) * day.postureSampleCount;
+  day.postureSampleCount += sampleCount;
+  day.postureScore = (existingTotal + scoreTotal) / day.postureSampleCount;
+  await saveStatistics(statistics);
+  return statistics;
+}
+
+export async function recordPostureWarning(now = new Date()): Promise<StoredStatistics> {
+  const statistics = await getStatistics();
+  ensureDay(statistics, getLocalDateKey(now)).warnings += 1;
+  await saveStatistics(statistics);
+  return statistics;
+}

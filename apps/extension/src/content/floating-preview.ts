@@ -1,12 +1,19 @@
 import { getPreviewDimensions, getPreviewOpacity } from "../features/preview/preview-settings";
+import { PostureEventAccumulator } from "../features/monitoring/posture-event-accumulator";
+import {
+  POSTURE_SAMPLE_BATCH_MESSAGE,
+  POSTURE_WARNING_MESSAGE
+} from "../features/monitoring/monitoring-messages";
 import { setPreviewActiveState } from "../features/preview/preview-state-storage";
 import { getSettings, saveSettings } from "../features/settings/settings-storage";
 import {
   startMonitoringSession,
   stopMonitoringSession
 } from "../features/statistics/statistics-storage";
+import type { PostureEstimate } from "@screenguard/vision";
 
 const HOST_ID = "screenguard-ai-floating-preview";
+const CREATING_ATTRIBUTE = "data-screenguard-preview-creating";
 const REMOVE_EVENT = "screenguard:remove-preview";
 const STOP_MONITORING_EVENT = "screenguard:stop-monitoring";
 const CORNERS = ["top-right", "bottom-right", "bottom-left", "top-left"] as const;
@@ -20,6 +27,9 @@ let isMinimized = false;
 let selectedOpacity = 0.75;
 let restoredWidth = 320;
 let restoredHeight = 220;
+let calibrationFeedbackUntil = 0;
+let isCalibrationActive = false;
+let postureEventAccumulator: PostureEventAccumulator | null = null;
 
 function getRuntimeUrl(path: string) {
   return chrome.runtime.getURL(path);
@@ -27,6 +37,22 @@ function getRuntimeUrl(path: string) {
 
 function getHost() {
   return document.getElementById(HOST_ID);
+}
+
+function isExtensionContextInvalidated(caughtError: unknown) {
+  return String(caughtError).includes("Extension context invalidated");
+}
+
+function runSafely(task: Promise<unknown>) {
+  void task.catch((caughtError: unknown) => {
+    if (isExtensionContextInvalidated(caughtError)) {
+      getHost()?.remove();
+      document.documentElement.removeAttribute(CREATING_ATTRIBUTE);
+      return;
+    }
+
+    console.error("ScreenGuard AI task failed:", caughtError);
+  });
 }
 
 function applyCorner(host: HTMLElement, corner: Corner) {
@@ -57,12 +83,14 @@ function setOverlayStatus(
 }
 
 function setControlsVisibility(host: HTMLElement) {
-  host
-    .querySelectorAll<HTMLElement>("[data-screenguard-normal]")
-    .forEach((element) => (element.hidden = isMinimized));
-  host
-    .querySelectorAll<HTMLElement>("[data-screenguard-minimized]")
-    .forEach((element) => (element.hidden = !isMinimized));
+  host.querySelectorAll<HTMLElement>("[data-screenguard-normal]").forEach((element) => {
+    element.hidden = isMinimized;
+    element.style.display = isMinimized ? "none" : "flex";
+  });
+  host.querySelectorAll<HTMLElement>("[data-screenguard-minimized]").forEach((element) => {
+    element.hidden = !isMinimized;
+    element.style.display = isMinimized ? "flex" : "none";
+  });
   host.style.resize = isMinimized ? "none" : "both";
 }
 
@@ -95,6 +123,80 @@ function createStatusOverlay() {
   return status;
 }
 
+function createPostureBadge() {
+  const badge = document.createElement("div");
+  badge.dataset.screenguardPosture = "true";
+  badge.dataset.screenguardNormal = "true";
+  badge.textContent = "Analyzing posture";
+  Object.assign(badge.style, {
+    position: "absolute",
+    inset: "50px auto auto 10px",
+    display: "flex",
+    alignItems: "center",
+    minHeight: "30px",
+    maxWidth: "130px",
+    padding: "0 10px",
+    border: "1px solid rgba(255,255,255,.5)",
+    borderRadius: "8px",
+    background: "rgba(10, 22, 19, .58)",
+    color: "white",
+    backdropFilter: "blur(14px) saturate(160%)",
+    font: "700 11px system-ui, sans-serif",
+    zIndex: "2"
+  });
+  return badge;
+}
+
+function updatePostureBadge(host: HTMLElement, state: string) {
+  const badge = host.querySelector<HTMLElement>("[data-screenguard-posture]");
+  if (!badge) {
+    return;
+  }
+
+  const presentations: Record<string, [string, string]> = {
+    healthy: ["Posture good", "rgba(15, 118, 104, .82)"],
+    leaning: ["Head is tilted", "rgba(180, 83, 9, .86)"],
+    "too-close": ["Move farther back", "rgba(145, 38, 30, .88)"],
+    unknown: ["Face not detected", "rgba(10, 22, 19, .58)"],
+    unavailable: ["Analysis unavailable", "rgba(112, 35, 24, .84)"]
+  };
+  const presentation = presentations[state] ?? ["Analyzing posture", "rgba(10, 22, 19, .58)"];
+
+  badge.textContent = presentation[0];
+  badge.style.background = presentation[1];
+}
+
+function setPostureBadgeMessage(host: HTMLElement, message: string, background: string) {
+  const badge = host.querySelector<HTMLElement>("[data-screenguard-posture]");
+  if (!badge) {
+    return;
+  }
+
+  badge.textContent = message;
+  badge.style.background = background;
+}
+
+function recordPostureEstimate(estimate: PostureEstimate) {
+  const monitoringEvent = postureEventAccumulator?.add(estimate);
+  if (monitoringEvent?.batch) {
+    runSafely(
+      chrome.runtime.sendMessage({
+        type: POSTURE_SAMPLE_BATCH_MESSAGE,
+        ...monitoringEvent.batch
+      })
+    );
+  }
+
+  if (monitoringEvent?.warning) {
+    runSafely(
+      chrome.runtime.sendMessage({
+        type: POSTURE_WARNING_MESSAGE,
+        state: monitoringEvent.warning
+      })
+    );
+  }
+}
+
 function makeIconButton(label: string, text: string, onClick: () => void) {
   const button = document.createElement("button");
   button.type = "button";
@@ -116,6 +218,31 @@ function makeIconButton(label: string, text: string, onClick: () => void) {
   return button;
 }
 
+function makeStopButton(onClick: () => void) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = "Stop monitoring";
+  button.title = "Stop monitoring";
+  Object.assign(button.style, {
+    position: "absolute",
+    left: "12px",
+    right: "12px",
+    bottom: "10px",
+    height: "34px",
+    border: "1px solid rgba(255,255,255,.72)",
+    borderRadius: "8px",
+    background: "rgba(145, 38, 30, .88)",
+    color: "white",
+    backdropFilter: "blur(14px) saturate(160%)",
+    font: "700 12px system-ui, sans-serif",
+    cursor: "pointer",
+    zIndex: "2"
+  });
+  button.dataset.screenguardNormal = "true";
+  button.addEventListener("click", onClick);
+  return button;
+}
+
 async function stopMonitoringAndClose() {
   const host = getHost();
   if (host) {
@@ -129,6 +256,7 @@ async function stopMonitoringAndClose() {
 
 async function persistMirrorPreference() {
   const settings = await getSettings();
+  postureEventAccumulator = new PostureEventAccumulator(settings.sensitivity);
   await saveSettings({
     ...settings,
     mirrorPreviewEnabled: isMirrored
@@ -162,13 +290,13 @@ function createControls(host: HTMLElement) {
     makeIconButton("Mirror preview", "⇋", () => {
       isMirrored = !isMirrored;
       postPreviewMessage(host, "set-mirror", isMirrored);
-      void persistMirrorPreference();
+      runSafely(persistMirrorPreference());
+    }),
+    makeIconButton("Calibrate posture", "◎", () => {
+      postPreviewMessage(host, "start-calibration");
     }),
     makeIconButton("Minimize preview", "−", () => {
       setMinimized(host, true);
-    }),
-    makeIconButton("Stop monitoring", "■", () => {
-      void stopMonitoringAndClose();
     }),
     makeIconButton("Hide preview", "×", () => {
       hidePreview();
@@ -197,7 +325,7 @@ function createMinimizedControls(host: HTMLElement) {
       setMinimized(host, false);
     }),
     makeIconButton("Stop monitoring", "■", () => {
-      void stopMonitoringAndClose();
+      runSafely(stopMonitoringAndClose());
     }),
     makeIconButton("Hide preview", "×", () => {
       hidePreview();
@@ -223,7 +351,7 @@ function createOpacityControl(host: HTMLElement, opacityPercent: number) {
     position: "absolute",
     left: "12px",
     right: "12px",
-    bottom: "10px",
+    bottom: "52px",
     display: "flex",
     alignItems: "center",
     gap: "8px",
@@ -240,7 +368,7 @@ function createOpacityControl(host: HTMLElement, opacityPercent: number) {
     host.dataset.opacity = String(selectedOpacity);
     host.style.opacity = String(selectedOpacity);
     value.textContent = `${input.value}%`;
-    void persistOpacityPreference(Number(input.value));
+    runSafely(persistOpacityPreference(Number(input.value)));
   });
 
   wrap.append(input, value);
@@ -303,15 +431,59 @@ async function createPreviewHost() {
 
     if (event.data.type === "camera-ready") {
       setOverlayStatus(host, "");
-      void setPreviewActiveState(true);
-      void startMonitoringSession();
+      runSafely(setPreviewActiveState(true));
+      runSafely(startMonitoringSession());
       return;
     }
 
     if (event.data.type === "camera-error") {
       setOverlayStatus(host, event.data.message ?? "Camera preview is unavailable.", "error");
-      void setPreviewActiveState(false);
-      void stopMonitoringSession();
+      runSafely(setPreviewActiveState(false));
+      runSafely(stopMonitoringSession());
+      return;
+    }
+
+    if (event.data.type === "posture-estimate") {
+      if (!isCalibrationActive && Date.now() >= calibrationFeedbackUntil) {
+        updatePostureBadge(host, event.data.payload?.state ?? "unknown");
+        recordPostureEstimate(event.data.payload as PostureEstimate);
+      }
+      return;
+    }
+
+    if (event.data.type === "calibration-started") {
+      isCalibrationActive = true;
+      setPostureBadgeMessage(host, "Sit upright and hold still", "rgba(15, 118, 104, .88)");
+      return;
+    }
+
+    if (event.data.type === "calibration-progress") {
+      const collected = Number(event.data.payload?.collected ?? 0);
+      const target = Number(event.data.payload?.target ?? 12);
+      setPostureBadgeMessage(host, `Calibrating ${collected}/${target}`, "rgba(15, 118, 104, .88)");
+      return;
+    }
+
+    if (event.data.type === "calibration-complete") {
+      isCalibrationActive = false;
+      calibrationFeedbackUntil = Date.now() + 2500;
+      setPostureBadgeMessage(host, "Calibration saved", "rgba(15, 118, 104, .88)");
+      return;
+    }
+
+    if (event.data.type === "calibration-error") {
+      isCalibrationActive = false;
+      calibrationFeedbackUntil = Date.now() + 3500;
+      setPostureBadgeMessage(
+        host,
+        event.data.message ?? "Calibration failed",
+        "rgba(145, 38, 30, .88)"
+      );
+      return;
+    }
+
+    if (event.data.type === "vision-error") {
+      updatePostureBadge(host, "unavailable");
     }
   });
 
@@ -325,9 +497,13 @@ async function createPreviewHost() {
   host.append(
     iframe,
     createStatusOverlay(),
+    createPostureBadge(),
     createControls(host),
     createMinimizedControls(host),
-    createOpacityControl(host, settings.cameraOpacity)
+    createOpacityControl(host, settings.cameraOpacity),
+    makeStopButton(() => {
+      runSafely(stopMonitoringAndClose());
+    })
   );
   setControlsVisibility(host);
   document.documentElement.append(host);
@@ -335,20 +511,37 @@ async function createPreviewHost() {
 
 function hidePreview() {
   const host = getHost();
-  if (host) {
-    postPreviewMessage(host, "stop-camera");
+  if (!host) {
+    return;
   }
 
-  getHost()?.remove();
-  void setPreviewActiveState(false);
+  host.style.display = "none";
+  runSafely(setPreviewActiveState(false));
+}
+
+function showPreview() {
+  const host = getHost();
+  if (!host) {
+    return;
+  }
+
+  host.style.display = "block";
+  runSafely(setPreviewActiveState(true));
 }
 
 function handleStopMonitoringEvent() {
-  void stopMonitoringAndClose();
+  runSafely(stopMonitoringAndClose());
 }
 
-if (!getHost()) {
-  void createPreviewHost();
+if (getHost()) {
+  showPreview();
+} else if (!document.documentElement.hasAttribute(CREATING_ATTRIBUTE)) {
+  document.documentElement.setAttribute(CREATING_ATTRIBUTE, "true");
+  runSafely(
+    createPreviewHost().finally(() => {
+      document.documentElement.removeAttribute(CREATING_ATTRIBUTE);
+    })
+  );
 }
 
 window.removeEventListener(REMOVE_EVENT, hidePreview);

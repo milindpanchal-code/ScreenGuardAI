@@ -7,6 +7,7 @@ export function PopupApp() {
   const {
     error,
     isBusy,
+    isCalibrated,
     isMonitoringActive,
     isPreviewActive,
     startPreview,
@@ -15,8 +16,8 @@ export function PopupApp() {
   } = useFloatingPreviewControls();
   const { summary } = useTodayStats();
   const summaryRows = useMemo(
-    () => getPopupSummaryRows(isMonitoringActive, isPreviewActive),
-    [isMonitoringActive, isPreviewActive]
+    () => getPopupSummaryRows(isMonitoringActive, isPreviewActive, isCalibrated),
+    [isMonitoringActive, isPreviewActive, isCalibrated]
   );
 
   return (

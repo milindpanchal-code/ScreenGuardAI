@@ -1,8 +1,24 @@
 import "./preview-frame.css";
+import { MediaPipeMonitoringEngine, type PostureEstimate } from "@screenguard/vision";
+import {
+  getCalibrationProfile,
+  saveCalibrationProfile
+} from "../features/calibration/calibration-storage";
+import type { CalibrationProfile } from "../features/calibration/calibration-schema";
 
 const video = document.getElementById("preview") as HTMLVideoElement | null;
 const status = document.getElementById("status") as HTMLParagraphElement | null;
 let activeStream: MediaStream | null = null;
+let monitoringEngine: MediaPipeMonitoringEngine | null = null;
+let animationFrameId: number | null = null;
+let lastInferenceAt = 0;
+let inferenceInProgress = false;
+const INFERENCE_INTERVAL_MS = 250;
+const CALIBRATION_SAMPLE_TARGET = 12;
+const CALIBRATION_TIMEOUT_MS = 10_000;
+let calibrationStartedAt = 0;
+let calibrationSamples: PostureEstimate[] = [];
+let isCalibrating = false;
 
 function setStatus(message: string) {
   if (status) {
@@ -11,15 +27,126 @@ function setStatus(message: string) {
   }
 }
 
-function notifyParent(type: "camera-ready" | "camera-error", message = "") {
+function notifyParent(type: string, message = "", payload?: unknown) {
   window.parent.postMessage(
     {
       source: "screenguard-ai",
       type,
-      message
+      message,
+      payload
     },
     "*"
   );
+}
+
+function schedulePostureEstimate() {
+  animationFrameId = requestAnimationFrame(runPostureEstimate);
+}
+
+function median(values: number[]) {
+  const sortedValues = [...values].sort((first, second) => first - second);
+  const middle = Math.floor(sortedValues.length / 2);
+  return sortedValues.length % 2 === 0
+    ? (sortedValues[middle - 1] + sortedValues[middle]) / 2
+    : sortedValues[middle];
+}
+
+async function collectCalibrationSample(estimate: PostureEstimate) {
+  if (!isCalibrating) {
+    return;
+  }
+
+  if (performance.now() - calibrationStartedAt >= CALIBRATION_TIMEOUT_MS) {
+    isCalibrating = false;
+    calibrationSamples = [];
+    notifyParent("calibration-error", "Keep your face visible and try calibration again.");
+    return;
+  }
+
+  if (estimate.faceWidthRatio === null || estimate.headTiltDegrees === null) {
+    return;
+  }
+
+  calibrationSamples.push(estimate);
+  notifyParent("calibration-progress", "", {
+    collected: calibrationSamples.length,
+    target: CALIBRATION_SAMPLE_TARGET
+  });
+  if (calibrationSamples.length < CALIBRATION_SAMPLE_TARGET) {
+    return;
+  }
+
+  isCalibrating = false;
+  const profile: CalibrationProfile = {
+    calibratedAt: new Date().toISOString(),
+    baselineFaceWidthRatio: median(
+      calibrationSamples.map((sample) => sample.faceWidthRatio as number)
+    ),
+    baselineHeadTiltDegrees: median(
+      calibrationSamples.map((sample) => sample.headTiltDegrees as number)
+    ),
+    sampleCount: calibrationSamples.length
+  };
+  calibrationSamples = [];
+  try {
+    await saveCalibrationProfile(profile);
+    monitoringEngine?.setCalibration(profile);
+    notifyParent("calibration-complete", "Calibration saved locally.");
+  } catch {
+    notifyParent("calibration-error", "Calibration could not be saved.");
+  }
+}
+
+function startCalibration() {
+  if (!monitoringEngine) {
+    notifyParent("calibration-error", "Wait for posture analysis to finish loading.");
+    return;
+  }
+
+  calibrationSamples = [];
+  calibrationStartedAt = performance.now();
+  isCalibrating = true;
+  notifyParent("calibration-started");
+}
+
+async function runPostureEstimate(timestamp: number) {
+  if (!video || !monitoringEngine || !activeStream) {
+    return;
+  }
+
+  if (
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    !inferenceInProgress &&
+    timestamp - lastInferenceAt >= INFERENCE_INTERVAL_MS
+  ) {
+    inferenceInProgress = true;
+    lastInferenceAt = timestamp;
+    try {
+      const estimate: PostureEstimate = await monitoringEngine.estimate(video);
+      notifyParent("posture-estimate", "", estimate);
+      await collectCalibrationSample(estimate);
+    } finally {
+      inferenceInProgress = false;
+    }
+  }
+
+  schedulePostureEstimate();
+}
+
+async function startPostureMonitoring() {
+  try {
+    setStatus("Loading local posture model...");
+    monitoringEngine = await MediaPipeMonitoringEngine.create({
+      modelAssetPath: chrome.runtime.getURL("models/face_landmarker.task"),
+      wasmRoot: chrome.runtime.getURL("wasm")
+    });
+    monitoringEngine.setCalibration(await getCalibrationProfile());
+    setStatus("");
+    schedulePostureEstimate();
+  } catch {
+    setStatus("");
+    notifyParent("vision-error", "Posture analysis is unavailable.");
+  }
 }
 
 function getCameraErrorMessage(caughtError: unknown): string {
@@ -61,6 +188,7 @@ async function startCamera() {
     await video.play();
     setStatus("");
     notifyParent("camera-ready");
+    await startPostureMonitoring();
   } catch (caughtError) {
     const message = getCameraErrorMessage(caughtError);
     setStatus(message);
@@ -69,6 +197,14 @@ async function startCamera() {
 }
 
 function stopCamera() {
+  isCalibrating = false;
+  calibrationSamples = [];
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+  monitoringEngine?.close();
+  monitoringEngine = null;
   activeStream?.getTracks().forEach((track) => track.stop());
   activeStream = null;
   if (video) {
@@ -77,7 +213,7 @@ function stopCamera() {
 }
 
 window.addEventListener("message", (event) => {
-  if (event.data?.source !== "screenguard-ai") {
+  if (event.source !== window.parent || event.data?.source !== "screenguard-ai") {
     return;
   }
 
@@ -88,6 +224,11 @@ window.addEventListener("message", (event) => {
 
   if (event.data.type === "set-mirror" && video) {
     video.style.transform = event.data.payload ? "scaleX(-1)" : "scaleX(1)";
+    return;
+  }
+
+  if (event.data.type === "start-calibration") {
+    startCalibration();
   }
 });
 

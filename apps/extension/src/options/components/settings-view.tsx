@@ -60,6 +60,20 @@ export function SettingsView() {
               <option value="large">Large</option>
             </select>
           </label>
+          <label className="space-y-2 text-sm font-medium">
+            <span>Notification cooldown</span>
+            <input
+              className="w-full rounded-md border border-[#b7cbc5] px-3 py-2"
+              max={120}
+              min={1}
+              onChange={(event) =>
+                updateDraft("notificationCooldownMinutes", Number(event.target.value))
+              }
+              type="number"
+              value={draft.notificationCooldownMinutes}
+            />
+            <span className="block text-xs text-[#435651]">Minutes between reminders</span>
+          </label>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">

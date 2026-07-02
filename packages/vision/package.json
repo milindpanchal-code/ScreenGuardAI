@@ -5,5 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.35"
   }
 }

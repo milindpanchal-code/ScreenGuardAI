@@ -24,6 +24,7 @@ export function useTodayStats() {
       date: "",
       activeMs: 0,
       postureScore: null,
+      postureSampleCount: 0,
       sessions: 0,
       warnings: 0
     })

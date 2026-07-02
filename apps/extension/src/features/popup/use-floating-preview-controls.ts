@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { getCalibrationProfile } from "../calibration/calibration-storage";
 import { getPreviewActiveState, setPreviewActiveState } from "../preview/preview-state-storage";
 import { getSettings } from "../settings/settings-storage";
 import { getMonitoringActiveState, stopMonitoringSession } from "../statistics/statistics-storage";
@@ -35,10 +36,12 @@ export function useFloatingPreviewControls() {
   const [isBusy, setIsBusy] = useState(false);
   const [isMonitoringActive, setIsMonitoringActive] = useState(false);
   const [isPreviewActive, setIsPreviewActive] = useState(false);
+  const [isCalibrated, setIsCalibrated] = useState(false);
 
   useEffect(() => {
     void getPreviewActiveState().then(setIsPreviewActive);
     void getMonitoringActiveState().then(setIsMonitoringActive);
+    void getCalibrationProfile().then((profile) => setIsCalibrated(Boolean(profile)));
   }, []);
 
   const startPreview = useCallback(async () => {
@@ -101,6 +104,7 @@ export function useFloatingPreviewControls() {
   return {
     error,
     isBusy,
+    isCalibrated,
     isMonitoringActive,
     isPreviewActive,
     openOptionsPage,

@@ -25,4 +25,11 @@ describe("getPopupSummaryRows", () => {
       value: "Active"
     });
   });
+
+  it("reports saved calibration state", () => {
+    expect(getPopupSummaryRows(true, true, true)[2]).toEqual({
+      label: "Calibration",
+      value: "Ready"
+    });
+  });
 });

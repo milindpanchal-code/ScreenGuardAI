@@ -5,7 +5,8 @@ export type PopupSummaryRow = {
 
 export function getPopupSummaryRows(
   isMonitoringActive: boolean,
-  isPreviewVisible: boolean
+  isPreviewVisible: boolean,
+  isCalibrated = false
 ): PopupSummaryRow[] {
   return [
     {
@@ -18,7 +19,7 @@ export function getPopupSummaryRows(
     },
     {
       label: "Calibration",
-      value: "Not set"
+      value: isCalibrated ? "Ready" : "Not set"
     }
   ];
 }

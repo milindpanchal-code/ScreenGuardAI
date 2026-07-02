@@ -3,9 +3,13 @@
   "name": "ScreenGuard AI",
   "description": "Local-first posture and ergonomics monitoring with an extension-owned camera preview.",
   "version": "0.1.0",
+  "icons": {
+    "128": "icon-128.png"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "ScreenGuard AI"
+    "default_title": "ScreenGuard AI",
+    "default_icon": "icon-128.png"
   },
   "background": {
     "service_worker": "assets/background.js",
@@ -13,6 +17,9 @@
   },
   "permissions": ["activeTab", "alarms", "notifications", "scripting", "storage"],
   "host_permissions": [],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "web_accessible_resources": [
     {
       "resources": ["preview-frame.html", "assets/*"],

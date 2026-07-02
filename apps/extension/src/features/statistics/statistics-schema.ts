@@ -2,6 +2,7 @@ export type DailyStats = {
   date: string;
   activeMs: number;
   postureScore: number | null;
+  postureSampleCount: number;
   sessions: number;
   warnings: number;
 };
@@ -39,6 +40,7 @@ function sanitizeDailyStats(value: unknown): DailyStats | null {
     date: source.date,
     activeMs: numberOrFallback(source.activeMs, 0),
     postureScore,
+    postureSampleCount: numberOrFallback(source.postureSampleCount, postureScore === null ? 0 : 1),
     sessions: numberOrFallback(source.sessions, 0),
     warnings: numberOrFallback(source.warnings, 0)
   };
@@ -79,6 +81,7 @@ export function ensureDay(statistics: StoredStatistics, dateKey: string): DailyS
     date: dateKey,
     activeMs: 0,
     postureScore: null,
+    postureSampleCount: 0,
     sessions: 0,
     warnings: 0
   };
