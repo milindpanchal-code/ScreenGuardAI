@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatDuration, type DailyStats } from "./statistics-schema";
-import { getTodayStats, resetStatistics } from "./statistics-storage";
+import { getStatistics, getTodayStats, resetStatistics } from "./statistics-storage";
 
 export type TodayStatsSummary = {
   activeTime: string;
   postureScore: string;
   sessions: string;
   warnings: string;
+};
+
+export type RecentDaySummary = TodayStatsSummary & {
+  date: string;
 };
 
 function toSummary(stats: DailyStats): TodayStatsSummary {
@@ -29,14 +33,25 @@ export function useTodayStats() {
       warnings: 0
     })
   );
+  const [isMonitoringActive, setIsMonitoringActive] = useState(false);
+  const [recentDays, setRecentDays] = useState<RecentDaySummary[]>([]);
 
   const refresh = useCallback(async () => {
-    setSummary(toSummary(await getTodayStats()));
+    const [today, statistics] = await Promise.all([getTodayStats(), getStatistics()]);
+    setSummary(toSummary(today));
+    setIsMonitoringActive(Boolean(statistics.activeSessionStartedAt));
+    setRecentDays(
+      statistics.days
+        .map((day) => (day.date === today.date ? today : day))
+        .sort((first, second) => second.date.localeCompare(first.date))
+        .slice(0, 7)
+        .map((day) => ({ date: day.date, ...toSummary(day) }))
+    );
   }, []);
 
   useEffect(() => {
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 30_000);
+    const interval = window.setInterval(() => void refresh(), 2_000);
     return () => window.clearInterval(interval);
   }, [refresh]);
 
@@ -48,6 +63,8 @@ export function useTodayStats() {
   return {
     refresh,
     reset,
-    summary
+    summary,
+    isMonitoringActive,
+    recentDays
   };
 }

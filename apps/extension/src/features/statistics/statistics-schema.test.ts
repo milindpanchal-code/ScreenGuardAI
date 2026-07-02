@@ -7,7 +7,7 @@ describe("statistics schema", () => {
   });
 
   it("formats active durations", () => {
-    expect(formatDuration(59_000)).toBe("0m");
+    expect(formatDuration(59_000)).toBe("59s");
     expect(formatDuration(5 * 60_000)).toBe("5m");
     expect(formatDuration(90 * 60_000)).toBe("1h 30m");
   });

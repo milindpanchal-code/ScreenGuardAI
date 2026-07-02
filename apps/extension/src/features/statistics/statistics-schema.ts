@@ -53,6 +53,7 @@ export function getLocalDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Sanitizes local statistics and discards malformed daily records. */
 export function sanitizeStatistics(value: unknown): StoredStatistics {
   if (!value || typeof value !== "object") {
     return defaultStatistics;
@@ -89,7 +90,12 @@ export function ensureDay(statistics: StoredStatistics, dateKey: string): DailyS
   return day;
 }
 
+/** Formats a duration for compact popup and statistics displays. */
 export function formatDuration(ms: number): string {
+  if (ms < 60_000) {
+    return `${Math.floor(ms / 1000)}s`;
+  }
+
   const totalMinutes = Math.floor(ms / 60_000);
   if (totalMinutes < 60) {
     return `${totalMinutes}m`;

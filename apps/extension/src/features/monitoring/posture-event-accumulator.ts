@@ -17,12 +17,13 @@ const SCORE_BY_STATE: Record<Exclude<PostureState, "unknown">, number> = {
   "too-close": 35
 };
 const WARNING_DELAY_MS: Record<Sensitivity, number> = {
-  low: 12_000,
-  medium: 8_000,
-  high: 5_000
+  low: 8_000,
+  medium: 5_000,
+  high: 3_000
 };
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 8;
 
+/** Converts frame estimates into score batches and sustained-posture warnings. */
 export class PostureEventAccumulator {
   private scoreTotal = 0;
   private sampleCount = 0;
@@ -55,12 +56,14 @@ export class PostureEventAccumulator {
       return event;
     }
 
-    if (this.poorState !== estimate.state) {
+    if (this.poorState === null) {
       this.poorState = estimate.state;
       this.poorStateStartedAt = now;
       this.warnedForCurrentEpisode = false;
       return event;
     }
+
+    this.poorState = estimate.state;
 
     if (
       !this.warnedForCurrentEpisode &&

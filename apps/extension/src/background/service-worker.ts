@@ -1,4 +1,5 @@
 import { setPreviewActiveState } from "../features/preview/preview-state-storage";
+import { getPreviewTabId, setPreviewTabId } from "../features/preview/preview-session-storage";
 import {
   isMonitoringMessage,
   POSTURE_SAMPLE_BATCH_MESSAGE
@@ -6,12 +7,29 @@ import {
 import { getSettings } from "../features/settings/settings-storage";
 import {
   recordPostureSampleBatch,
-  recordPostureWarning
+  recordPostureWarning,
+  stopMonitoringSession
 } from "../features/statistics/statistics-storage";
 import { localStorageAdapter } from "../platform/storage/local-storage";
 
 const LAST_WARNING_AT_KEY = "screenguard.notifications.last-warning-at";
 let monitoringMessageQueue: Promise<void> = Promise.resolve();
+
+function reportBackgroundError(context: string, caughtError: unknown) {
+  console.error(`ScreenGuard ${context} failed:`, caughtError);
+}
+
+function runBackgroundTask(context: string, task: Promise<unknown>) {
+  void task.catch((caughtError: unknown) => reportBackgroundError(context, caughtError));
+}
+
+async function finishTrackedTabSession(tabId: number) {
+  if ((await getPreviewTabId()) !== tabId) {
+    return;
+  }
+
+  await Promise.all([stopMonitoringSession(), setPreviewActiveState(false), setPreviewTabId(null)]);
+}
 
 async function showPostureWarning(state: "leaning" | "too-close") {
   const settings = await getSettings();
@@ -49,26 +67,24 @@ async function handleMonitoringMessage(message: unknown) {
   await showPostureWarning(message.state);
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  void chrome.alarms.create("screenguard.lifecycle", {
-    periodInMinutes: 60
-  });
+chrome.tabs.onRemoved.addListener((tabId) => {
+  runBackgroundTask("tab removal cleanup", finishTrackedTabSession(tabId));
 });
 
-chrome.tabs.onRemoved.addListener(() => {
-  void setPreviewActiveState(false);
-});
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name !== "screenguard.lifecycle") {
-    return;
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "loading") {
+    runBackgroundTask("tab navigation cleanup", finishTrackedTabSession(tabId));
   }
 });
 
-chrome.runtime.onMessage.addListener((message) => {
-  monitoringMessageQueue = monitoringMessageQueue
-    .then(() => handleMonitoringMessage(message))
-    .catch((caughtError: unknown) => {
-      console.error("ScreenGuard monitoring message failed:", caughtError);
-    });
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  const operation = monitoringMessageQueue.then(() => handleMonitoringMessage(message));
+  monitoringMessageQueue = operation.catch((caughtError: unknown) => {
+    reportBackgroundError("monitoring message", caughtError);
+  });
+  void operation.then(
+    () => sendResponse({ ok: true }),
+    () => sendResponse({ ok: false })
+  );
+  return true;
 });

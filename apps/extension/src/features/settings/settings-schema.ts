@@ -51,6 +51,7 @@ function booleanOrFallback(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+/** Converts untrusted persisted or imported data into bounded extension settings. */
 export function sanitizeSettings(value: unknown): ScreenGuardSettings {
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 

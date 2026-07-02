@@ -44,10 +44,5 @@ export const localStorageAdapter = {
   async getBoolean(key: string, fallback: boolean): Promise<boolean> {
     const value = await this.get<unknown>(key, fallback);
     return typeof value === "boolean" ? value : fallback;
-  },
-
-  async getNonEmptyString(key: string, fallback: string): Promise<string> {
-    const value = await this.get<unknown>(key, fallback);
-    return typeof value === "string" && value.trim() ? value : fallback;
   }
 };

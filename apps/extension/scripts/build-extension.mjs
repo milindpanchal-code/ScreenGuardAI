@@ -1,11 +1,12 @@
 import { build as buildWithEsbuild } from "esbuild";
 import { build as buildWithVite } from "vite";
 import { copyFile, mkdir } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("../", import.meta.url).pathname;
+const root = fileURLToPath(new URL("../", import.meta.url));
 
 await buildWithVite({
-  configFile: new URL("../vite.config.ts", import.meta.url).pathname
+  configFile: fileURLToPath(new URL("../vite.config.ts", import.meta.url))
 });
 
 await buildWithEsbuild({

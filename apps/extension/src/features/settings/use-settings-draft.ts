@@ -13,7 +13,17 @@ export function useSettingsDraft() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void getSettings().then(setDraft);
+    let isMounted = true;
+    void getSettings()
+      .then((settings) => {
+        if (isMounted) setDraft(settings);
+      })
+      .catch(() => {
+        if (isMounted) setMessage("Settings could not be loaded.");
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const updateDraft = useCallback(
@@ -27,14 +37,22 @@ export function useSettingsDraft() {
   );
 
   const saveDraft = useCallback(async () => {
-    await saveSettings(draft);
-    setMessage("Settings saved locally.");
+    try {
+      await saveSettings(draft);
+      setMessage("Settings saved locally.");
+    } catch {
+      setMessage("Settings could not be saved.");
+    }
   }, [draft]);
 
   const resetDraft = useCallback(async () => {
-    const settings = await resetSettings();
-    setDraft(settings);
-    setMessage("Settings reset.");
+    try {
+      const settings = await resetSettings();
+      setDraft(settings);
+      setMessage("Settings reset.");
+    } catch {
+      setMessage("Settings could not be reset.");
+    }
   }, []);
 
   const importDraft = useCallback(async (json: string) => {

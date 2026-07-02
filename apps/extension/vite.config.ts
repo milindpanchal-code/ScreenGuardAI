@@ -1,8 +1,9 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 
 function fromRoot(path: string) {
-  return new URL(path, import.meta.url).pathname;
+  return fileURLToPath(new URL(path, import.meta.url));
 }
 
 export default defineConfig({

@@ -10,6 +10,7 @@ export type MonitoringMessage =
       state: "leaning" | "too-close";
     };
 
+/** Validates messages accepted by the background monitoring service. */
 export function isMonitoringMessage(value: unknown): value is MonitoringMessage {
   if (!value || typeof value !== "object") {
     return false;

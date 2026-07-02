@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getCalibrationProfile } from "../calibration/calibration-storage";
 import { getPreviewActiveState, setPreviewActiveState } from "../preview/preview-state-storage";
+import { setPreviewTabId } from "../preview/preview-session-storage";
 import { getSettings } from "../settings/settings-storage";
 import { getMonitoringActiveState, stopMonitoringSession } from "../statistics/statistics-storage";
 
@@ -39,9 +40,20 @@ export function useFloatingPreviewControls() {
   const [isCalibrated, setIsCalibrated] = useState(false);
 
   useEffect(() => {
-    void getPreviewActiveState().then(setIsPreviewActive);
-    void getMonitoringActiveState().then(setIsMonitoringActive);
-    void getCalibrationProfile().then((profile) => setIsCalibrated(Boolean(profile)));
+    let isMounted = true;
+    void Promise.all([getPreviewActiveState(), getMonitoringActiveState(), getCalibrationProfile()])
+      .then(([previewActive, monitoringActive, calibration]) => {
+        if (!isMounted) return;
+        setIsPreviewActive(previewActive);
+        setIsMonitoringActive(monitoringActive);
+        setIsCalibrated(Boolean(calibration));
+      })
+      .catch(() => {
+        if (isMounted) setError("ScreenGuard status could not be loaded.");
+      });
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const startPreview = useCallback(async () => {
@@ -60,6 +72,7 @@ export function useFloatingPreviewControls() {
         files: [PREVIEW_SCRIPT_FILE]
       });
       await setPreviewActiveState(true);
+      await setPreviewTabId(tab.id);
       setIsPreviewActive(true);
     } catch (caughtError) {
       const message =
@@ -86,6 +99,7 @@ export function useFloatingPreviewControls() {
 
       await stopMonitoringSession();
       await setPreviewActiveState(false);
+      await setPreviewTabId(null);
       setIsMonitoringActive(false);
       setIsPreviewActive(false);
     } catch (caughtError) {

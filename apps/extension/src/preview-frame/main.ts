@@ -40,7 +40,9 @@ function notifyParent(type: string, message = "", payload?: unknown) {
 }
 
 function schedulePostureEstimate() {
-  animationFrameId = requestAnimationFrame(runPostureEstimate);
+  if (activeStream && monitoringEngine && animationFrameId === null) {
+    animationFrameId = requestAnimationFrame(runPostureEstimate);
+  }
 }
 
 function median(values: number[]) {
@@ -110,27 +112,29 @@ function startCalibration() {
 }
 
 async function runPostureEstimate(timestamp: number) {
+  animationFrameId = null;
   if (!video || !monitoringEngine || !activeStream) {
     return;
   }
 
-  if (
-    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-    !inferenceInProgress &&
-    timestamp - lastInferenceAt >= INFERENCE_INTERVAL_MS
-  ) {
-    inferenceInProgress = true;
-    lastInferenceAt = timestamp;
-    try {
+  try {
+    if (
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      !inferenceInProgress &&
+      timestamp - lastInferenceAt >= INFERENCE_INTERVAL_MS
+    ) {
+      inferenceInProgress = true;
+      lastInferenceAt = timestamp;
       const estimate: PostureEstimate = await monitoringEngine.estimate(video);
       notifyParent("posture-estimate", "", estimate);
       await collectCalibrationSample(estimate);
-    } finally {
-      inferenceInProgress = false;
     }
+  } catch (caughtError) {
+    console.error("ScreenGuard posture inference failed:", caughtError);
+  } finally {
+    inferenceInProgress = false;
+    schedulePostureEstimate();
   }
-
-  schedulePostureEstimate();
 }
 
 async function startPostureMonitoring() {
@@ -212,7 +216,7 @@ function stopCamera() {
   }
 }
 
-window.addEventListener("message", (event) => {
+function handleParentMessage(event: MessageEvent) {
   if (event.source !== window.parent || event.data?.source !== "screenguard-ai") {
     return;
   }
@@ -230,6 +234,17 @@ window.addEventListener("message", (event) => {
   if (event.data.type === "start-calibration") {
     startCalibration();
   }
-});
+}
 
-void startCamera();
+window.addEventListener("message", handleParentMessage);
+window.addEventListener(
+  "pagehide",
+  () => {
+    window.removeEventListener("message", handleParentMessage);
+    stopCamera();
+  },
+  { once: true }
+);
+void startCamera().catch((caughtError: unknown) => {
+  console.error("ScreenGuard camera startup failed:", caughtError);
+});

@@ -9,6 +9,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+/** Validates persisted calibration geometry without retaining camera frames. */
 export function sanitizeCalibrationProfile(value: unknown): CalibrationProfile | null {
   if (!value || typeof value !== "object") {
     return null;

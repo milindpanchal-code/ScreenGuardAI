@@ -8,7 +8,7 @@ import {
   type StoredStatistics
 } from "./statistics-schema";
 
-const STATISTICS_KEY = "screenguard.statistics";
+export const STATISTICS_STORAGE_KEY = "screenguard.statistics";
 const MAX_STORED_DAYS = 45;
 
 function trimOldDays(statistics: StoredStatistics): StoredStatistics {
@@ -20,14 +20,17 @@ function trimOldDays(statistics: StoredStatistics): StoredStatistics {
 
 export async function getStatistics(): Promise<StoredStatistics> {
   const storedStatistics = await localStorageAdapter.get<unknown>(
-    STATISTICS_KEY,
+    STATISTICS_STORAGE_KEY,
     defaultStatistics
   );
   return trimOldDays(sanitizeStatistics(storedStatistics));
 }
 
 export async function saveStatistics(statistics: StoredStatistics): Promise<void> {
-  await localStorageAdapter.set(STATISTICS_KEY, trimOldDays(sanitizeStatistics(statistics)));
+  await localStorageAdapter.set(
+    STATISTICS_STORAGE_KEY,
+    trimOldDays(sanitizeStatistics(statistics))
+  );
 }
 
 export async function resetStatistics(): Promise<StoredStatistics> {
@@ -35,6 +38,7 @@ export async function resetStatistics(): Promise<StoredStatistics> {
   return defaultStatistics;
 }
 
+/** Starts one idempotent monitoring session and increments today's session count. */
 export async function startMonitoringSession(now = new Date()): Promise<StoredStatistics> {
   const statistics = await getStatistics();
   if (statistics.activeSessionStartedAt) {
@@ -52,6 +56,7 @@ export async function getMonitoringActiveState(): Promise<boolean> {
   return Boolean((await getStatistics()).activeSessionStartedAt);
 }
 
+/** Finishes the active session and adds its elapsed time to the start day. */
 export async function stopMonitoringSession(now = new Date()): Promise<StoredStatistics> {
   const statistics = await getStatistics();
   if (!statistics.activeSessionStartedAt) {
@@ -87,6 +92,7 @@ export async function getTodayStats(now = new Date()): Promise<DailyStats> {
   };
 }
 
+/** Merges an aggregated posture-score batch into today's weighted average. */
 export async function recordPostureSampleBatch(
   scoreTotal: number,
   sampleCount: number,

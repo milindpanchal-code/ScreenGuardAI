@@ -12,7 +12,7 @@ export function SettingsActions({ onExport, onImport, onReset }: SettingsActions
     anchor.href = url;
     anchor.download = "screenguard-settings.json";
     anchor.click();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   async function handleImport(file: File | undefined) {

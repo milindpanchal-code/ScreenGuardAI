@@ -16,7 +16,3 @@ export async function saveCalibrationProfile(profile: CalibrationProfile): Promi
 
   await localStorageAdapter.set(CALIBRATION_STORAGE_KEY, sanitizedProfile);
 }
-
-export async function resetCalibrationProfile(): Promise<void> {
-  await localStorageAdapter.remove(CALIBRATION_STORAGE_KEY);
-}
