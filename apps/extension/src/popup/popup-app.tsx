@@ -12,8 +12,7 @@ export function PopupApp() {
     startPreview,
     stopMonitoring,
     openOptionsPage
-  } =
-    useFloatingPreviewControls();
+  } = useFloatingPreviewControls();
   const { summary } = useTodayStats();
   const summaryRows = useMemo(
     () => getPopupSummaryRows(isMonitoringActive, isPreviewActive),

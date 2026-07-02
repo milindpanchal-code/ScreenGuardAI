@@ -2,6 +2,7 @@ import "./preview-frame.css";
 
 const video = document.getElementById("preview") as HTMLVideoElement | null;
 const status = document.getElementById("status") as HTMLParagraphElement | null;
+let activeStream: MediaStream | null = null;
 
 function setStatus(message: string) {
   if (status) {
@@ -55,6 +56,7 @@ async function startCamera() {
         facingMode: "user"
       }
     });
+    activeStream = stream;
     video.srcObject = stream;
     await video.play();
     setStatus("");
@@ -66,12 +68,27 @@ async function startCamera() {
   }
 }
 
+function stopCamera() {
+  activeStream?.getTracks().forEach((track) => track.stop());
+  activeStream = null;
+  if (video) {
+    video.srcObject = null;
+  }
+}
+
 window.addEventListener("message", (event) => {
-  if (event.data?.source !== "screenguard-ai" || event.data?.type !== "set-mirror" || !video) {
+  if (event.data?.source !== "screenguard-ai") {
     return;
   }
 
-  video.style.transform = event.data.payload ? "scaleX(-1)" : "scaleX(1)";
+  if (event.data.type === "stop-camera") {
+    stopCamera();
+    return;
+  }
+
+  if (event.data.type === "set-mirror" && video) {
+    video.style.transform = event.data.payload ? "scaleX(-1)" : "scaleX(1)";
+  }
 });
 
 void startCamera();

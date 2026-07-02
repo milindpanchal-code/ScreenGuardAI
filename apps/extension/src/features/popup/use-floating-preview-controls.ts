@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { getPreviewActiveState, setPreviewActiveState } from "../preview/preview-state-storage";
 import { getSettings } from "../settings/settings-storage";
-import {
-  getMonitoringActiveState,
-  stopMonitoringSession
-} from "../statistics/statistics-storage";
+import { getMonitoringActiveState, stopMonitoringSession } from "../statistics/statistics-storage";
 
 type OptionsView = "settings" | "statistics";
 
@@ -61,7 +58,6 @@ export function useFloatingPreviewControls() {
       });
       await setPreviewActiveState(true);
       setIsPreviewActive(true);
-      setIsMonitoringActive(true);
     } catch (caughtError) {
       const message =
         caughtError instanceof Error ? caughtError.message : "Unable to start the camera preview.";
@@ -90,9 +86,7 @@ export function useFloatingPreviewControls() {
       setIsMonitoringActive(false);
       setIsPreviewActive(false);
     } catch (caughtError) {
-      setError(
-        caughtError instanceof Error ? caughtError.message : "Unable to stop monitoring."
-      );
+      setError(caughtError instanceof Error ? caughtError.message : "Unable to stop monitoring.");
     } finally {
       setIsBusy(false);
     }

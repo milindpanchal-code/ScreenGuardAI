@@ -20,7 +20,6 @@ let isMinimized = false;
 let selectedOpacity = 0.75;
 let restoredWidth = 320;
 let restoredHeight = 220;
-let capturedStream: MediaStream | null = null;
 
 function getRuntimeUrl(path: string) {
   return chrome.runtime.getURL(path);
@@ -117,16 +116,15 @@ function makeIconButton(label: string, text: string, onClick: () => void) {
   return button;
 }
 
-function stopCapturedStream() {
-  capturedStream?.getTracks().forEach((track) => track.stop());
-  capturedStream = null;
-}
-
 async function stopMonitoringAndClose() {
-  stopCapturedStream();
+  const host = getHost();
+  if (host) {
+    postPreviewMessage(host, "stop-camera");
+  }
+
   await stopMonitoringSession();
   await setPreviewActiveState(false);
-  getHost()?.remove();
+  host?.remove();
 }
 
 async function persistMirrorPreference() {
@@ -304,9 +302,6 @@ async function createPreviewHost() {
     }
 
     if (event.data.type === "camera-ready") {
-      if (event.data.stream instanceof MediaStream) {
-        capturedStream = event.data.stream;
-      }
       setOverlayStatus(host, "");
       void setPreviewActiveState(true);
       void startMonitoringSession();
@@ -339,8 +334,17 @@ async function createPreviewHost() {
 }
 
 function hidePreview() {
+  const host = getHost();
+  if (host) {
+    postPreviewMessage(host, "stop-camera");
+  }
+
   getHost()?.remove();
   void setPreviewActiveState(false);
+}
+
+function handleStopMonitoringEvent() {
+  void stopMonitoringAndClose();
 }
 
 if (!getHost()) {
@@ -349,5 +353,5 @@ if (!getHost()) {
 
 window.removeEventListener(REMOVE_EVENT, hidePreview);
 window.addEventListener(REMOVE_EVENT, hidePreview);
-window.removeEventListener(STOP_MONITORING_EVENT, () => void stopMonitoringAndClose());
-window.addEventListener(STOP_MONITORING_EVENT, () => void stopMonitoringAndClose());
+window.removeEventListener(STOP_MONITORING_EVENT, handleStopMonitoringEvent);
+window.addEventListener(STOP_MONITORING_EVENT, handleStopMonitoringEvent);
