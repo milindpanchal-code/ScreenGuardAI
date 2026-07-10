@@ -24,18 +24,17 @@ export function SettingsActions({ onExport, onImport, onReset }: SettingsActions
   }
 
   return (
-    <section className="glass-panel rounded-lg p-4">
-      <h2 className="text-lg font-semibold">Privacy-first data</h2>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          className="focus-ring rounded-md bg-[#0f7668] px-3 py-2 text-sm font-semibold text-white"
-          onClick={handleExport}
-          type="button"
-        >
-          Export
+    <section className="options-card settings-actions-card">
+      <h2>Manage settings</h2>
+      <p>Back up or restore your locally stored preferences.</p>
+      <div className="settings-actions-list">
+        <button className="focus-ring settings-action-button" onClick={handleExport} type="button">
+          <Upload size={18} strokeWidth={2.1} />
+          Export settings
         </button>
-        <label className="focus-ring rounded-md border border-[#b7cbc5] bg-white/75 px-3 py-2 text-sm font-semibold text-[#18302a]">
-          Import
+        <label className="focus-ring settings-action-button">
+          <Download size={18} strokeWidth={2.1} />
+          Import settings
           <input
             accept="application/json"
             className="hidden"
@@ -44,13 +43,15 @@ export function SettingsActions({ onExport, onImport, onReset }: SettingsActions
           />
         </label>
         <button
-          className="focus-ring rounded-md border border-[#efb2a7] bg-[#fff4f1] px-3 py-2 text-sm font-semibold text-[#934133]"
+          className="focus-ring settings-action-button is-danger"
           onClick={onReset}
           type="button"
         >
-          Reset
+          <RotateCcw size={18} strokeWidth={2.1} />
+          Reset settings
         </button>
       </div>
     </section>
   );
 }
+import { Download, RotateCcw, Upload } from "lucide-react";

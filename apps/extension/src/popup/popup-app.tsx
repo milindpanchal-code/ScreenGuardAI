@@ -1,7 +1,25 @@
 import { useMemo } from "react";
+import {
+  BarChart3,
+  CalendarDays,
+  Clock3,
+  Play,
+  ScanLine,
+  Settings,
+  ShieldCheck,
+  Square,
+  UserRound,
+  Video
+} from "lucide-react";
 import { useFloatingPreviewControls } from "../features/popup/use-floating-preview-controls";
 import { getPopupSummaryRows } from "../features/popup/popup-summary";
 import { useTodayStats } from "../features/statistics/use-today-stats";
+
+const summaryIcons = {
+  Monitoring: Clock3,
+  Camera: Video,
+  Calibration: ScanLine
+};
 
 export function PopupApp() {
   const {
@@ -21,72 +39,103 @@ export function PopupApp() {
   );
 
   return (
-    <main className="w-[360px] bg-[#edf6f3] p-3 text-[#13241f]">
-      <section className="glass-panel rounded-lg p-4">
-        <header className="mb-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#287466]">
-            ScreenGuard AI
-          </p>
-          <h1 className="mt-1 text-xl font-semibold leading-tight">Posture preview</h1>
+    <main className="popup-shell">
+      <section className="popup-panel">
+        <header className="popup-header">
+          <div className="popup-brand">
+            <span className="popup-brand-mark" aria-hidden="true">
+              <ShieldCheck size={23} strokeWidth={2.4} />
+            </span>
+            <h1>ScreenGuard AI</h1>
+          </div>
+          <button
+            aria-label="Open settings"
+            className="focus-ring popup-icon-button"
+            onClick={() => openOptionsPage("settings")}
+            title="Settings"
+            type="button"
+          >
+            <Settings size={21} strokeWidth={2.4} />
+          </button>
         </header>
 
-        <div className="space-y-2">
-          {summaryRows.map((row) => (
-            <div
-              className="flex items-center justify-between rounded-md bg-white/60 px-3 py-2 text-sm"
-              key={row.label}
-            >
-              <span className="text-[#435651]">{row.label}</span>
-              <span className="font-medium text-[#10231e]">{row.value}</span>
+        <div className="popup-overview">
+          <div className="posture-dial" aria-hidden="true">
+            <div className="posture-dial-inner">
+              <UserRound size={46} strokeWidth={1.9} />
             </div>
-          ))}
-        </div>
+          </div>
 
-        <div className="mt-3 rounded-md bg-white/60 px-3 py-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[#435651]">Today</span>
-            <span className="font-medium text-[#10231e]">{summary.activeTime}</span>
+          <div className="popup-status-list">
+            {summaryRows.map((row) => {
+              const Icon = summaryIcons[row.label as keyof typeof summaryIcons];
+
+              return (
+                <div className="popup-status-row" key={row.label}>
+                  <span className="popup-status-label">
+                    <Icon size={18} strokeWidth={2} />
+                    {row.label}
+                  </span>
+                  <span
+                    className={
+                      row.value === "Not set" ? "popup-status-value" : "popup-status-value is-ready"
+                    }
+                  >
+                    {row.value}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="popup-status-row">
+              <span className="popup-status-label">
+                <CalendarDays size={18} strokeWidth={2} />
+                Today
+              </span>
+              <span className="popup-status-value">{summary.activeTime}</span>
+            </div>
           </div>
         </div>
 
-        {error ? (
-          <p className="mt-3 rounded-md border border-[#efb2a7] bg-[#fff4f1] px-3 py-2 text-sm text-[#934133]">
-            {error}
-          </p>
-        ) : null}
+        {error ? <p className="popup-error">{error}</p> : null}
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="popup-actions">
           <button
-            className="focus-ring rounded-md bg-[#0f7668] px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="focus-ring popup-button popup-button-primary"
             disabled={isBusy}
             onClick={startPreview}
             type="button"
           >
+            <Play size={19} fill="currentColor" strokeWidth={2.2} />
             {isMonitoringActive && !isPreviewActive ? "Show Preview" : "Start Preview"}
           </button>
           <button
-            className="focus-ring rounded-md border border-[#b7cbc5] bg-white/78 px-3 py-2 text-sm font-semibold text-[#18302a] disabled:opacity-60"
+            className="focus-ring popup-button popup-button-secondary"
             disabled={isBusy}
             onClick={stopMonitoring}
             type="button"
           >
+            <Square size={17} strokeWidth={2.4} />
             Stop Monitoring
           </button>
           <button
-            className="focus-ring rounded-md border border-[#b7cbc5] bg-white/78 px-3 py-2 text-sm font-semibold text-[#18302a]"
+            className="focus-ring popup-button popup-button-secondary"
             onClick={() => openOptionsPage("settings")}
             type="button"
           >
+            <Settings size={19} strokeWidth={2.2} />
             Settings
           </button>
           <button
-            className="focus-ring rounded-md border border-[#b7cbc5] bg-white/78 px-3 py-2 text-sm font-semibold text-[#18302a]"
+            className="focus-ring popup-button popup-button-secondary"
             onClick={() => openOptionsPage("statistics")}
             type="button"
           >
+            <BarChart3 size={19} strokeWidth={2.2} />
             Statistics
           </button>
         </div>
+
+        <p className="popup-tagline">Your posture. Your health. Your productivity.</p>
       </section>
     </main>
   );

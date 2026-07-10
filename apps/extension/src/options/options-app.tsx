@@ -7,10 +7,13 @@ export function OptionsApp() {
   const { activeView, setView } = useOptionsView();
 
   return (
-    <main className="min-h-screen bg-[#edf6f3] px-4 py-6 text-[#12211d]">
-      <div className="mx-auto max-w-5xl">
+    <main className="options-page">
+      <div className="options-shell">
         <OptionsHeader activeView={activeView} onViewChange={setView} />
-        {activeView === "settings" ? <SettingsView /> : <StatisticsView />}
+        <section className="options-content">
+          <p className="options-eyebrow">Control Center</p>
+          {activeView === "settings" ? <SettingsView /> : <StatisticsView />}
+        </section>
       </div>
     </main>
   );

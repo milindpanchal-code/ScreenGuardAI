@@ -1,124 +1,190 @@
+import {
+  Bell,
+  Camera,
+  LockKeyhole,
+  MonitorUp,
+  Moon,
+  Save,
+  SlidersHorizontal,
+  Sparkles,
+  Volume2
+} from "lucide-react";
 import { useSettingsDraft } from "../../features/settings/use-settings-draft";
 import { SettingsActions } from "./settings-actions";
+
+const preferenceItems = [
+  {
+    key: "cameraPreviewEnabled",
+    label: "Camera preview",
+    description: "See yourself during monitoring",
+    Icon: Camera
+  },
+  {
+    key: "mirrorPreviewEnabled",
+    label: "Mirror preview",
+    description: "Mirror the camera image",
+    Icon: MonitorUp
+  },
+  {
+    key: "notificationSoundEnabled",
+    label: "Notification sound",
+    description: "Play sound with reminders",
+    Icon: Volume2
+  },
+  {
+    key: "autoStartMonitoring",
+    label: "Auto-start monitoring",
+    description: "Start when the browser opens",
+    Icon: Sparkles
+  },
+  {
+    key: "darkModeEnabled",
+    label: "Dark mode",
+    description: "Use the dark interface theme",
+    Icon: Moon
+  }
+] as const;
 
 export function SettingsView() {
   const { draft, exportDraft, importDraft, message, resetDraft, saveDraft, updateDraft } =
     useSettingsDraft();
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-      <section className="glass-panel rounded-lg p-4">
-        <h2 className="text-lg font-semibold">Settings</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2 text-sm font-medium">
-            <span>Safe distance</span>
-            <input
-              className="w-full rounded-md border border-[#b7cbc5] px-3 py-2"
-              max={100}
-              min={35}
-              onChange={(event) => updateDraft("safeDistanceCm", Number(event.target.value))}
-              type="number"
-              value={draft.safeDistanceCm}
-            />
-          </label>
-          <label className="space-y-2 text-sm font-medium">
-            <span>Sensitivity</span>
-            <select
-              className="w-full rounded-md border border-[#b7cbc5] px-3 py-2"
-              onChange={(event) =>
-                updateDraft("sensitivity", event.target.value as typeof draft.sensitivity)
-              }
-              value={draft.sensitivity}
+    <div className="settings-page">
+      <header className="options-view-header">
+        <h1>Settings</h1>
+        <p>Customize your posture monitoring experience.</p>
+      </header>
+      <div className="settings-layout">
+        <div className="settings-main-column">
+          <section className="options-card">
+            <div className="options-card-heading">
+              <SlidersHorizontal size={20} strokeWidth={2.2} />
+              <h2>Monitoring</h2>
+            </div>
+            <div className="settings-fields-grid">
+              <label className="settings-field">
+                <span>Safe distance (cm)</span>
+                <input
+                  max={100}
+                  min={35}
+                  onChange={(event) => updateDraft("safeDistanceCm", Number(event.target.value))}
+                  type="number"
+                  value={draft.safeDistanceCm}
+                />
+              </label>
+              <label className="settings-field">
+                <span>Sensitivity</span>
+                <select
+                  onChange={(event) =>
+                    updateDraft("sensitivity", event.target.value as typeof draft.sensitivity)
+                  }
+                  value={draft.sensitivity}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label className="settings-field settings-range-field">
+                <span>Preview opacity</span>
+                <div>
+                  <strong>{draft.cameraOpacity}%</strong>
+                  <input
+                    max={100}
+                    min={35}
+                    onChange={(event) => updateDraft("cameraOpacity", Number(event.target.value))}
+                    type="range"
+                    value={draft.cameraOpacity}
+                  />
+                </div>
+              </label>
+              <label className="settings-field">
+                <span>Preview size</span>
+                <select
+                  onChange={(event) =>
+                    updateDraft("cameraSize", event.target.value as typeof draft.cameraSize)
+                  }
+                  value={draft.cameraSize}
+                >
+                  <option value="compact">Compact</option>
+                  <option value="comfortable">Comfortable</option>
+                  <option value="large">Large</option>
+                </select>
+              </label>
+              <label className="settings-field">
+                <span>Notification cooldown (minutes)</span>
+                <input
+                  max={120}
+                  min={1}
+                  onChange={(event) =>
+                    updateDraft("notificationCooldownMinutes", Number(event.target.value))
+                  }
+                  type="number"
+                  value={draft.notificationCooldownMinutes}
+                />
+                <small>Time between posture reminders.</small>
+              </label>
+            </div>
+          </section>
+
+          <section className="options-card">
+            <div className="options-card-heading">
+              <Bell size={20} strokeWidth={2.2} />
+              <h2>Preferences</h2>
+            </div>
+            <div className="preference-grid">
+              {preferenceItems.map(({ key, label, description, Icon }) => (
+                <label className="preference-item" key={key}>
+                  <Icon size={19} strokeWidth={2.1} />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                  <input
+                    checked={draft[key]}
+                    onChange={(event) => updateDraft(key, event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <div className="settings-save-row">
+            <button
+              className="focus-ring settings-save-button"
+              onClick={() => void saveDraft()}
+              type="button"
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
-          </label>
-          <label className="space-y-2 text-sm font-medium">
-            <span>Preview opacity</span>
-            <input
-              max={100}
-              min={35}
-              onChange={(event) => updateDraft("cameraOpacity", Number(event.target.value))}
-              type="range"
-              value={draft.cameraOpacity}
-            />
-            <span className="block text-xs text-[#435651]">{draft.cameraOpacity}%</span>
-          </label>
-          <label className="space-y-2 text-sm font-medium">
-            <span>Preview size</span>
-            <select
-              className="w-full rounded-md border border-[#b7cbc5] px-3 py-2"
-              onChange={(event) =>
-                updateDraft("cameraSize", event.target.value as typeof draft.cameraSize)
-              }
-              value={draft.cameraSize}
-            >
-              <option value="compact">Compact</option>
-              <option value="comfortable">Comfortable</option>
-              <option value="large">Large</option>
-            </select>
-          </label>
-          <label className="space-y-2 text-sm font-medium">
-            <span>Notification cooldown</span>
-            <input
-              className="w-full rounded-md border border-[#b7cbc5] px-3 py-2"
-              max={120}
-              min={1}
-              onChange={(event) =>
-                updateDraft("notificationCooldownMinutes", Number(event.target.value))
-              }
-              type="number"
-              value={draft.notificationCooldownMinutes}
-            />
-            <span className="block text-xs text-[#435651]">Minutes between reminders</span>
-          </label>
+              <Save size={18} strokeWidth={2.3} />
+              Save settings
+            </button>
+            <p>{message ?? "All changes are saved locally and never leave your device."}</p>
+          </div>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {[
-            ["cameraPreviewEnabled", "Camera preview"],
-            ["mirrorPreviewEnabled", "Mirror preview"],
-            ["notificationSoundEnabled", "Notification sound"],
-            ["autoStartMonitoring", "Auto-start monitoring"],
-            ["darkModeEnabled", "Dark mode"]
-          ].map(([key, label]) => (
-            <label className="flex items-center gap-3 rounded-md bg-white/65 px-3 py-2" key={key}>
-              <input
-                checked={Boolean(draft[key as keyof typeof draft])}
-                onChange={(event) =>
-                  updateDraft(key as keyof typeof draft, event.target.checked as never)
-                }
-                type="checkbox"
-              />
-              <span className="text-sm font-medium">{label}</span>
-            </label>
-          ))}
-        </div>
+        <aside className="settings-side-column">
+          <section className="options-card camera-permission-card">
+            <span className="camera-permission-icon" aria-hidden="true">
+              <Camera size={28} strokeWidth={2.1} />
+            </span>
+            <h2>Camera permission</h2>
+            <p>Camera access is requested only in the extension preview context.</p>
+          </section>
 
-        <button
-          className="focus-ring mt-5 rounded-md bg-[#0f7668] px-4 py-2 text-sm font-semibold text-white"
-          onClick={() => void saveDraft()}
-          type="button"
-        >
-          Save settings
-        </button>
-        {message ? <p className="mt-3 text-sm text-[#287466]">{message}</p> : null}
-      </section>
+          <section className="options-card privacy-card">
+            <LockKeyhole size={20} strokeWidth={2.2} />
+            <h2>Privacy first</h2>
+            <p>Your posture data stays on your device. We do not collect personal information.</p>
+          </section>
 
-      <div className="space-y-4">
-        <section className="glass-panel rounded-lg p-4">
-          <h2 className="text-lg font-semibold">Camera permission</h2>
-          <p className="mt-2 text-sm leading-6 text-[#435651]">
-            Camera access is requested only by the extension preview context.
-          </p>
-        </section>
-        <SettingsActions
-          onExport={exportDraft}
-          onImport={(json) => void importDraft(json)}
-          onReset={() => void resetDraft()}
-        />
+          <SettingsActions
+            onExport={exportDraft}
+            onImport={(json) => void importDraft(json)}
+            onReset={() => void resetDraft()}
+          />
+        </aside>
       </div>
     </div>
   );

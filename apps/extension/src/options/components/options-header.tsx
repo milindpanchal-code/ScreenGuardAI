@@ -1,3 +1,4 @@
+import { BarChart3, CircleCheck, Settings, ShieldCheck } from "lucide-react";
 import type { OptionsView } from "../options-view";
 
 type OptionsHeaderProps = {
@@ -7,27 +8,37 @@ type OptionsHeaderProps = {
 
 export function OptionsHeader({ activeView, onViewChange }: OptionsHeaderProps) {
   return (
-    <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#287466]">
-          ScreenGuard AI
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold">Control center</h1>
+    <aside className="options-sidebar">
+      <div className="options-brand">
+        <span className="options-brand-mark" aria-hidden="true">
+          <ShieldCheck size={23} strokeWidth={2.4} />
+        </span>
+        <span>ScreenGuard AI</span>
       </div>
-      <div className="inline-flex rounded-lg border border-[#b7cbc5] bg-white/70 p-1">
-        {(["settings", "statistics"] as const).map((view) => (
+      <nav aria-label="Control center sections" className="options-nav">
+        {[
+          { view: "settings" as const, label: "Settings", Icon: Settings },
+          { view: "statistics" as const, label: "Statistics", Icon: BarChart3 }
+        ].map(({ view, label, Icon }) => (
           <button
-            className={`focus-ring rounded-md px-4 py-2 text-sm font-semibold capitalize ${
-              activeView === view ? "bg-[#0f7668] text-white" : "text-[#29423c]"
-            }`}
+            aria-current={activeView === view ? "page" : undefined}
+            className={`focus-ring options-nav-button ${activeView === view ? "is-active" : ""}`}
             key={view}
             onClick={() => onViewChange(view)}
             type="button"
           >
-            {view}
+            <Icon size={19} strokeWidth={2.2} />
+            {label}
           </button>
         ))}
+      </nav>
+      <div className="options-sidebar-footer">
+        <span>
+          <CircleCheck size={15} fill="currentColor" strokeWidth={2.5} />
+          Local-first storage
+        </span>
+        <span>Changes are saved on this device.</span>
       </div>
-    </header>
+    </aside>
   );
 }
